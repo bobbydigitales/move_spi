@@ -8,11 +8,21 @@
 #include <time.h>
 #include <sys/ioctl.h>
 
+
+struct SPI_Memory {
+    unsigned char outgoing_midi[256];
+    unsigned char outgoing_random[512];
+    unsigned char outgoing_unknown[1280];
+    unsigned char incoming_midi[256];
+    unsigned char incoming_random[512];
+    unsigned char incoming_unknown[1280];
+};
+
 int main() {
     const char *device_path = "/dev/ablspi0.0";
     struct timespec sleep_time;
     sleep_time.tv_sec = 0;
-    sleep_time.tv_nsec = 500 * 1000000; 
+    sleep_time.tv_nsec = 10 * 1000000; 
     ;
     int fd;
     void *addr;
@@ -45,13 +55,37 @@ int main() {
     // 256 bytes of USB MIDI
     // 512 bytes of something (Audio or Display)
     // 1280 left?
-    
+
+    struct SPI_Memory* SPIMemory = addr;
+
+    memset(addr, 0, 4096);
+    int ioctl_result = 0;
+    ioctl_result = (fd, _IOC(_IOC_NONE, 0, 0xb, 0), 0x1312d00);
+
     while(1) {
         printf("\033[H\033[J");
-        int result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
+        
+        for (int i=0; i<512; i++) {
+            *(SPIMemory->outgoing_midi + i) = rand() % 255;
+        }
+        
+        ioctl_result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
+
         char *mapped_memory = (char *)addr;
         for (int i = 0; i < 4096; ++i) {
             printf("%02x ", (unsigned char)mapped_memory[i]);
+            if (i == 2048-1) {
+                printf("\n\n");
+            }
+
+            if (i == 2048 + 256-1) {
+                printf("\n\n");
+            }
+
+            if (i== 2048+256+512-1) {
+                printf("\n\n");
+            }
+
         }
         printf("\n");
         nanosleep(&sleep_time, NULL);

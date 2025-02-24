@@ -23,7 +23,7 @@ int main()
     off_t offset = 0;
 
     // Open the device file.
-    printf("Opening file");
+    printf("Opening file\n");
     fd = open(device_path, O_RDWR);
     if (fd == -1)
     {
@@ -31,7 +31,7 @@ int main()
         return 1;
     }
 
-    printf("mmaping");
+    printf("mmaping\n");
     addr = mmap(NULL, length, prot, flags, fd, offset);
 
     if (addr == MAP_FAILED)
@@ -41,7 +41,7 @@ int main()
         return 1;
     }
 
-    printf("Reading memory...");
+    printf("Reading memory...\n");
     // 4096 bytes
     // first 2048 - outgoing data
     // next 2048 bytes
@@ -49,11 +49,17 @@ int main()
     // 512 bytes of something (Audio or Display)
     // 1280 left?
 
+    memset(addr, 0, 4096);
+
+    int ioctl_result = 0;
+    ioctl_result = (fd, _IOC(_IOC_NONE, 0, 0xb, 0), 0x1312d00);
+
+
     while (1)
     {
         // printf("\033[H\033[J");
 
-        int result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
+        ioctl_result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
         unsigned char *mapped_memory = (unsigned char *)addr;
         int startByte = 2048;
         int length = 256;
