@@ -8,7 +8,6 @@
 #include <fcntl.h>
 
 
-// Global variable to store the mmap return value
 unsigned char *global_mmap_addr = NULL;
 FILE* output_file;
 int frame_counter = 0;
@@ -71,13 +70,10 @@ void write_mem()
     frame_counter++;
 }
 
-// Function pointer to the real mmap
 void *(*real_mmap)(void *, size_t, int, int, int, off_t) = NULL;
 
-// Our hooked mmap function
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 {
-    // Initialize the real_mmap function pointer if it's not already set
     if (!real_mmap)
     {
         real_mmap = dlsym(RTLD_NEXT, "mmap");
@@ -88,20 +84,20 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
         }
     }
 
-    // Call the real mmap function
     void *result = real_mmap(addr, length, prot, flags, fd, offset);
 
-    // Store the result in the global variable
-    global_mmap_addr = result;
 
-    // Log the call (optional)
+    if (length == 4096) {
+        global_mmap_addr = result;
+    }
+
     printf("mmap hooked! addr=%p, length=%zu, prot=%d, flags=%d, fd=%d, offset=%ld, result=%p\n",
            addr, length, prot, flags, fd, offset, result);
 
            
-    // output_file = fopen("spi_memory.txt", "w+");
+    output_file = fopen("spi_memory.txt", "w+");
            
-    print_mem();
+    // print_mem();
     // write_mem();
 
     return result;
@@ -145,8 +141,8 @@ int ioctl(int fd, unsigned long request, char *argp)
         }
     }
 
-    print_mem();
-    // write_mem();
+    // print_mem();
+    write_mem();
 
 
 
