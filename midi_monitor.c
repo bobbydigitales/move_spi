@@ -113,11 +113,6 @@ int main()
                 continue;
             }
 
-            // unsigned int packet = mapped_memory[i];
-            // if (packet == 0) {
-            //     continue;
-            // }
-
             unsigned char *byte = &mapped_memory[i];
             unsigned char cable = (*byte & 0b11110000) >> 4;
             unsigned char code_index_number = (*byte & 0b00001111);
@@ -130,19 +125,10 @@ int main()
                 continue;
             }
 
-            // printf("%x ", (unsigned int)mapped_memory[i]);
-            // printf("%02x ", (unsigned char)mapped_memory[i + 1]);
-            // printf("%02x ", (unsigned char)mapped_memory[i + 2]);
-            // printf("%02x ", (unsigned char)mapped_memory[i + 3]);
-            // printf("\n");
-
             printf("cable: %x,\tcode index number:%x,\tmidi_0:%x,\tmidi_1:%x,\tmidi_2:%x\n", cable, code_index_number, midi_0, midi_1, midi_2);
         }
-        // printf("\n");
-        // nanosleep(&sleep_time, NULL);
     }
 
-    // Unmap the memory.
     if (munmap(mapped_memory, length) == -1)
     {
         perror("munmap");
