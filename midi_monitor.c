@@ -89,10 +89,10 @@ int main()
         // }
 
         // for (int i=0; i<265/4; i+=4) {
-            unsigned char values[] = {0|0x4, 0xF0, 0x00, 0x21, 
-                                      0|0x4, 0x1D, 0x01, 0x01,
-                                      0|0x7, 0x06, 1, 0xF7};
-            memcpy(((struct SPI_Memory*)mapped_memory)->outgoing_midi, values, sizeof(values));
+            // unsigned char values[] = {0|0x4, 0xF0, 0x00, 0x21, 
+            //                           0|0x4, 0x1D, 0x01, 0x01,
+            //                           0|0x7, 0x06, 1, 0xF7};
+            // memcpy(((struct SPI_Memory*)mapped_memory)->outgoing_midi, values, sizeof(values));
             // ((struct SPI_Memory*)mapped_memory)->outgoing_midi[0] = 0 | 0x9;
             // ((struct SPI_Memory*)mapped_memory)->outgoing_midi[1] = 0x90;
             // ((struct SPI_Memory*)mapped_memory)->outgoing_midi[2] = 0x44 + padIndex++ % 0x20;
