@@ -18,25 +18,25 @@ struct SPI_Memory
     unsigned char incoming_unknown[1280];
 };
 
-
-void clearPads(unsigned char* mapped_memory, int fd) {
+void clearPads(unsigned char *mapped_memory, int fd)
+{
 
     // clear pads
     int j = 0;
-    for (int i=0, pad = 0; pad < 32; pad++)
+    for (int i = 0, pad = 0; pad < 32; pad++)
     {
-        j = i*4;
+        j = i * 4;
 
         ((struct SPI_Memory *)mapped_memory)->outgoing_midi[j + 0] = 0 | 0x9;
         ((struct SPI_Memory *)mapped_memory)->outgoing_midi[j + 1] = 0x90;
         ((struct SPI_Memory *)mapped_memory)->outgoing_midi[j + 2] = (68 + pad);
         ((struct SPI_Memory *)mapped_memory)->outgoing_midi[j + 3] = 0;
 
-
-        if (i > 9) {
+        if (i > 9)
+        {
             int ioctl_result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
             // memset(((struct SPI_Memory *)mapped_memory)->outgoing_midi, 0, 256);
-            i=0;
+            i = 0;
         }
 
         printf("clearing pad %d\n", pad);
@@ -45,28 +45,27 @@ void clearPads(unsigned char* mapped_memory, int fd) {
     }
 
     int ioctl_result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
-
-
 }
 
-void clearSequencerButtons(unsigned char* mapped_memory, int fd) {
+void clearSequencerButtons(unsigned char *mapped_memory, int fd)
+{
 
     // clear pads
     int j = 0;
-    for (int i=0, pad = 0; pad < 16; pad++)
+    for (int i = 0, pad = 0; pad < 16; pad++)
     {
-        j = i*4;
+        j = i * 4;
 
         ((struct SPI_Memory *)mapped_memory)->outgoing_midi[j + 0] = 0 | 0x9;
         ((struct SPI_Memory *)mapped_memory)->outgoing_midi[j + 1] = 0x90;
         ((struct SPI_Memory *)mapped_memory)->outgoing_midi[j + 2] = (16 + pad);
         ((struct SPI_Memory *)mapped_memory)->outgoing_midi[j + 3] = 0;
 
-
-        if (i > 9) {
+        if (i > 9)
+        {
             int ioctl_result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
             // memset(((struct SPI_Memory *)mapped_memory)->outgoing_midi, 0, 256);
-            i=0;
+            i = 0;
         }
 
         printf("clearing button %d\n", pad);
@@ -75,8 +74,21 @@ void clearSequencerButtons(unsigned char* mapped_memory, int fd) {
     }
 
     int ioctl_result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
+}
 
+void kickM8(unsigned char *mapped_memory, int fd)
+{
+    int out_cable = 2;
+    unsigned char LPPInitSysex[24] = {
+        out_cable << 4 | 0x4, 0xF0, 126, 0,
+        out_cable << 4 | 0x4, 6, 2, 0,
+        out_cable << 4 | 0x4, 32, 41, 0x00,
+        out_cable << 4 | 0x4, 0x00, 0x00, 0x00,
+        out_cable << 4 | 0x4, 0x00, 0x00, 0x00,
+        out_cable << 4 | 0x6, 0x00, 0xF7, 0x0};
 
+    memcpy(((struct SPI_Memory *)mapped_memory)->outgoing_midi, LPPInitSysex, 23);
+    int ioctl_result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
 }
 
 int main()
@@ -131,7 +143,9 @@ int main()
     clearPads(mapped_memory, fd);
     clearSequencerButtons(mapped_memory, fd);
 
-    int knobs[8] = {0,0,0,0,0,0,0,0};
+    kickM8(mapped_memory, fd);
+
+    int knobs[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
     while (1)
     {
@@ -194,14 +208,14 @@ int main()
             // if ((code_index_number == 2 || code_index_number == 1) || (cable == 0xf && code_index_number == control_change && midi_0 == 176))
             // {
             //     continue;
-            // }
+            // })
 
             if (byte[1] + byte[2] + byte[3] == 0)
             {
                 continue;
             }
 
-            printf("cable: %x,\tcode index number:%x,\tmidi_0:%x,\tmidi_1:%d,\tmidi_2:%d\n", cable, code_index_number, midi_0, midi_1, midi_2);
+            printf("cable: %x,\tcode index number:%x,\tmidi_0:%x,\tmidi_1:%x,\tmidi_2:%x\n", cable, code_index_number, midi_0, midi_1, midi_2);
             // printf("first_byte%d,\tmidi_0:%x,\tmidi_1:%d,\tmidi_2:%d\n", byte, midi_0, midi_1, midi_2);
 
             // swap input channels
@@ -221,10 +235,24 @@ int main()
                 ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 0] = 0 | 0x9;
                 ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 1] = 0x90;
                 ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 2] = byte[2];
-                ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 3] = padColor % 0x7f;
+                // ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 3] = padColor % 0x7f;
+                ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 3] = byte[3];
                 padColor++;
 
-                out_index++;
+                out_index+=4;
+            }
+
+            if (byte[1] == 0x80 && cable == 2)
+            {
+                int oi = out_index;
+                ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 0] = 0 | 0x8;
+                ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 1] = 0x80;
+                ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 2] = byte[2];
+                // ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 3] = padColor % 0x7f;
+                ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 3] = byte[3];
+                padColor++;
+
+                out_index+=4;
             }
 
             // Note-on message on virtual cable 1 (CN=0x1; CIN=0x9) 9n kk vv 19 9n kk vv
@@ -241,7 +269,7 @@ int main()
                 ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 3] = 100;
                 printf("Sending Note On %x %x %x %d\n", cable << 4 | 0x9, 0x90 | channel, byte[2], 100);
 
-                out_index++;
+                out_index+=4;
             }
 
             if (byte[1] == 0xb0 && cable == 0)
@@ -253,32 +281,33 @@ int main()
 
                 int knob = byte[2] - 71;
 
-                if (byte[3] == 127) {
-                    knobs[knob] -=1;
+                if (byte[3] == 127)
+                {
+                    knobs[knob] -= 1;
                 }
 
-                if (byte[3] == 1) {
+                if (byte[3] == 1)
+                {
                     knobs[knob] += 1;
                 }
 
-                if (knobs[knob] >127) {
+                if (knobs[knob] > 127)
+                {
                     knobs[knob] = 127;
                 }
 
-                if (knobs[knob] <0 ) {
+                if (knobs[knob] < 0)
+                {
                     knobs[knob] = 0;
                 }
-
-
-
 
                 ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 0] = out_cable << 4 | 0xb;
                 ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 1] = 0xb0;
                 ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 2] = byte[2];
-                ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 3] =(unsigned char)knobs[knob];
+                ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 3] = (unsigned char)knobs[knob];
                 printf("Sending CC to external %x %x %x %d\n", out_cable << 4 | 0xb, 0xb0, byte[2], byte[3]);
 
-                out_index++;
+                out_index+=4;
             }
 
             if (byte[1] == 0x80 && cable == 0)
@@ -294,12 +323,12 @@ int main()
                 ((struct SPI_Memory *)mapped_memory)->outgoing_midi[oi + 3] = 100;
                 printf("Sending Note Off %x %x %x %d\n", cable << 4 | 0x8, 0x80 | channel, byte[2], 100);
 
-                out_index++;
+                out_index+=4;
             }
 
-            printf("out index: %d\n", out_index);
         }
-
+        
+        // printf("out index: %d\n", out_index);
         // memset(((struct SPI_Memory *)mapped_memory)->incoming_midi, 0, 256);
     }
 

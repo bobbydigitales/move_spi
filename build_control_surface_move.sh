@@ -1,0 +1,2 @@
+#!/bin/bash
+gcc -g control_surface_move.c -o control_surface_move -Llibs/quickjs/quickjs-2025-04-26/ -lquickjs -lm && ./copy.sh control_surface_move && scp move_m8.js ableton@move:./Projects/move_spi/ && scp move_default.js ableton@move:./Projects/move_spi/
