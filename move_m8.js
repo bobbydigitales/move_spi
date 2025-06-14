@@ -24,8 +24,8 @@ const moveControlToLppNoteMap = new Map([
     [86, 10],
     [60, 50],
     [58, 3],
-    [118, 98],
-    [78, 99]
+    [118, 98]
+    // [78, 99]
 ]);
 
 
@@ -92,7 +92,7 @@ globalThis.onMidiMessageExternal = function (data) {
 
 globalThis.onMidiMessageInternal = function (data) {
     console.log(`onMidiMessageInternal ${data[0].toString(16)} ${data[1].toString(16)} ${data[2].toString(16)}`);
-    
+
     let isNote = data[0] === 0x80 || data[0] === 0x90;
     let isControlMessage = data[0] === 0xB0;
     let isAftertouch = data[0] === 0xA0;
@@ -101,40 +101,43 @@ globalThis.onMidiMessageInternal = function (data) {
         console.log(`Move: unknown message:`, data);
         return;
     }
-    
+
     if (isNote) {
         let moveNoteNumber = data[1];
         let lppNote = moveToLppPadMap.get(moveNoteNumber);
-        
+
         if (!lppNote) {
             console.log(`Move: unmapped note [${moveNoteNumber}]`);
             return;
         }
-        
+
         let moveVelocity = data[2];
-        
+
         let lppVelocity = moveVelocity; //moveVelocityToLppVelocityMap.get(data[2]) ?? moveVelocity;
-        
-        
+
+
         console.log(`Sending Move note ${moveNoteNumber} velocity: ${moveVelocity} to LPP pad ${lppNote} velocity: ${lppVelocity}`);
         move_midi_external_send([2 << 4 | (data[0] / 0xF), data[0], lppNote, lppVelocity]);
         return;
     }
-    
+
     if (isControlMessage) {
 
         console.log("control message");
         let moveControlNumber = data[1];
+
         let lppNote = moveControlToLppNoteMap.get(moveControlNumber);
+
 
         if (!lppNote) {
             console.log(`Move: unmapped control [${moveControlNumber}]`);
-            // Yeet the control at the M8 anyway.
-            move_midi_external_send([2 << 4 | 0xb, 0xb0, moveControlNumber, data[2]]);
+            handleMoveKnobs(data);
             return;
         }
 
         let pressed = data[2] === 127;
+    
+
         console.log(`Sending Move control ${moveControlNumber} to LPP pad ${lppNote} pressed:${pressed}`);
         if (pressed) {
             move_midi_external_send([2 << 4 | 0x9, 0x90, lppNote, 100]);
@@ -149,20 +152,61 @@ globalThis.onMidiMessageInternal = function (data) {
     if (isAftertouch) {
         let value = data[2]
         // Send per note aftertouch out as a single MIDI Modwheel CC
-        console.log(`Sending Move aftertouch value ${value} to as CC 110`);
+        console.log(`Sending Move aftertouch value ${value} to as CC 1`);
 
-        move_midi_external_send([2 << 4 | 0xb, 0xb0, 110, value]);
+        move_midi_external_send([2 << 4 | 0xb, 0xb0, 1, value]);
         return;
     }
-
-
 
     console.log(`Unmapped Move message: ${data}`);
 
 }
 
-let lppInitSysex = [0xF0, 126, 0, 6, 2, 0, 32, 41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF7];
+function clamp(value, min, max) {
+    if (value > max) {
+        return max;
+    }
+    
+    if (value < min) {
+        return min;
+    }
+    
+    return value;
+}
 
+let knobs = [0,0,0,0,0,0,0,0,0];
+function handleMoveKnobs(data) {
+
+    let knob = -1;
+
+    let moveControlNumber = data[1];
+    let value = data[2];
+
+    console.log(moveControlNumber, value)
+
+    // If this is a Move knob, turn it into a 0-127 value vs +/- 1 values so we can map to to things on the M8
+    if (moveControlNumber >= 71 && moveControlNumber <= 80) {
+        knob = moveControlNumber - 71;
+    }
+
+    if (knob != -1) {
+
+        if (value === 127) {
+            knobs[knob] -= 1;
+        }
+
+        if (value === 1) {
+            knobs[knob] += 1;
+        }
+
+        knobs[knob] = clamp(knobs[knob], 0, 127);
+
+        console.log(`Sending CC ${moveControlNumber} to M8 value: ${knobs[knob]}`);
+        move_midi_external_send([2 << 4 | 0xb, 0xb0, moveControlNumber, knobs[knob]]);
+    }
+}
+
+let lppInitSysex = [0xF0, 126, 0, 6, 2, 0, 32, 41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF7];
 
 function initLPP() {
     let out_cable = 2;
