@@ -1,4 +1,6 @@
-"use strict";
+// import { aftertouchToModwheel } from "./aftertouch_to_modwheel.mjs";
+import { handleMoveKnobs } from "./move_virtual_knobs.mjs";
+
 
 // https://github.com/Ableton/push-interface/blob/main/doc/AbletonPush2MIDIDisplayInterface.asc#setting-led-colors
 
@@ -45,7 +47,7 @@ const lppPadToMovePadMap = new Map([
 const moveToLppPadMap = new Map([...lppPadToMovePadMap.entries()].map((a) => [a[1], a[0]]));
 
 
-const dark_grey = 124;
+// const dark_grey = 124;
 const light_grey = 124;
 const green = 0xfe;
 const lppColorToMoveColorMap = new Map([
@@ -59,10 +61,8 @@ const moveColorToLppColorMap = new Map([...lppColorToMoveColorMap.entries()].map
 
 globalThis.onMidiMessageExternal = function (data) {
     console.log(`onMidiMessageExternal ${data[0].toString(16)} ${data[1].toString(16)} ${data[2].toString(16)}`);
-    let isNoteOn = data[0] === 0x90;
-    let isNoteOff = data[0] === 0x80;
 
-    if (!(isNoteOn || isNoteOff)) {
+    if (!(data[0] === 0x90 || data[0] === 0x80)) {
         console.log(`Got message from M8 that is not a note: ${data}`);
     }
 
@@ -94,10 +94,10 @@ globalThis.onMidiMessageInternal = function (data) {
     console.log(`onMidiMessageInternal ${data[0].toString(16)} ${data[1].toString(16)} ${data[2].toString(16)}`);
 
     let isNote = data[0] === 0x80 || data[0] === 0x90;
-    let isControlMessage = data[0] === 0xB0;
-    let isAftertouch = data[0] === 0xA0;
+    let isCC = data[0] === 0xb0;
+    let isAt = data[0] === 0xa0;
 
-    if (!(isNote || isControlMessage || isAftertouch)) {
+    if (!(isNote || isCC || isAt)) {
         console.log(`Move: unknown message:`, data);
         return;
     }
@@ -121,7 +121,7 @@ globalThis.onMidiMessageInternal = function (data) {
         return;
     }
 
-    if (isControlMessage) {
+    if (isCC) {
 
         console.log("control message");
         let moveControlNumber = data[1];
@@ -149,61 +149,12 @@ globalThis.onMidiMessageInternal = function (data) {
     }
 
 
-    if (isAftertouch) {
-        let value = data[2]
-        // Send per note aftertouch out as a single MIDI Modwheel CC
-        console.log(`Sending Move aftertouch value ${value} to as CC 1`);
-
-        move_midi_external_send([2 << 4 | 0xb, 0xb0, 1, value]);
-        return;
-    }
+    // if (aftertouchToModwheel(data)) {
+    //     return;
+    // }
 
     console.log(`Unmapped Move message: ${data}`);
 
-}
-
-function clamp(value, min, max) {
-    if (value > max) {
-        return max;
-    }
-    
-    if (value < min) {
-        return min;
-    }
-    
-    return value;
-}
-
-let knobs = [0,0,0,0,0,0,0,0,0];
-function handleMoveKnobs(data) {
-
-    let knob = -1;
-
-    let moveControlNumber = data[1];
-    let value = data[2];
-
-    console.log(moveControlNumber, value)
-
-    // If this is a Move knob, turn it into a 0-127 value vs +/- 1 values so we can map to to things on the M8
-    if (moveControlNumber >= 71 && moveControlNumber <= 80) {
-        knob = moveControlNumber - 71;
-    }
-
-    if (knob != -1) {
-
-        if (value === 127) {
-            knobs[knob] -= 1;
-        }
-
-        if (value === 1) {
-            knobs[knob] += 1;
-        }
-
-        knobs[knob] = clamp(knobs[knob], 0, 127);
-
-        console.log(`Sending CC ${moveControlNumber} to M8 value: ${knobs[knob]}`);
-        move_midi_external_send([2 << 4 | 0xb, 0xb0, moveControlNumber, knobs[knob]]);
-    }
 }
 
 let lppInitSysex = [0xF0, 126, 0, 6, 2, 0, 32, 41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF7];
@@ -227,9 +178,7 @@ function initLPP() {
 }
 
 
-function initialize() {
+globalThis.init = function() {
     console.log("Move control surface script staring...");
     initLPP();
 }
-
-initialize();

@@ -83,6 +83,8 @@ int queueMidiSend(int cable, unsigned char *buffer, int length)
     // int ioctl_result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
 
     outgoing_midi_counter += length;
+    // printf("queueMidiSend: %d\n", outgoing_midi_counter);
+    // if (outgoing_midi_counter > )
 }
 
 int queueExternalMidiSend(unsigned char *buffer, int length)
@@ -256,7 +258,7 @@ static int eval_buf(JSContext *ctx, const void *buf, int buf_len,
 static int eval_file(JSContext *ctx, const char *filename, int module)
 {
     uint8_t *buf;
-    int ret, eval_flags;
+    int ret, eval_flags = JS_EVAL_FLAG_STRICT; // Always eval in strict mode.
     size_t buf_len;
 
     printf("Loading control surface script: %s\n", filename);
@@ -272,9 +274,9 @@ static int eval_file(JSContext *ctx, const char *filename, int module)
     //               JS_DetectModule((const char *)buf, buf_len));
     // }
     if (module)
-        eval_flags = JS_EVAL_TYPE_MODULE;
+        eval_flags |= JS_EVAL_TYPE_MODULE;
     else
-        eval_flags = JS_EVAL_TYPE_GLOBAL;
+        eval_flags |= JS_EVAL_TYPE_GLOBAL;
     ret = eval_buf(ctx, buf, buf_len, filename, eval_flags);
     js_free(ctx, buf);
     return ret;
@@ -419,6 +421,8 @@ void init_javascript(JSRuntime **prt, JSContext **pctx)
 
     JS_FreeValue(ctx, global_obj);
 
+    JS_SetModuleLoaderFunc(rt, NULL, js_module_loader, NULL);
+
     // Free our reference to the global object
 
     // eval_file(ctx, "move_m8.js", -1);
@@ -454,26 +458,33 @@ void getGlobalFunction(JSContext **pctx, const char *func_name, JSValue *retFunc
 int callGlobalFunction(JSContext **pctx, JSValue *pfunc, unsigned char *data)
 {
     JSContext *ctx = *pctx;
-    JSValue newArray;
 
-    // args[0] = JS_NewString(ctx, "foo");
-    newArray = JS_NewArray(ctx);
+    JSValue ret;
 
-    JSValue num;
-    if (!JS_IsException(newArray))
-    { // Check creation success
+    if (data != 0) {
+        JSValue newArray;
 
-        for (int i = 0; i < 3; i++)
-        {
-            num = JS_NewInt32(ctx, data[i]);
-            JS_SetPropertyUint32(ctx, newArray, i, num);
+        // args[0] = JS_NewString(ctx, "foo");
+        newArray = JS_NewArray(ctx);
+
+        JSValue num;
+        if (!JS_IsException(newArray))
+        { // Check creation success
+
+            for (int i = 0; i < 3; i++)
+            {
+                num = JS_NewInt32(ctx, data[i]);
+                JS_SetPropertyUint32(ctx, newArray, i, num);
+            }
         }
+
+        JSValue args[1];
+        args[0] = newArray;
+
+        ret = JS_Call(ctx, *pfunc, JS_UNDEFINED, 1, args);
+    } else {
+        ret = JS_Call(ctx, *pfunc, JS_UNDEFINED, 0, 0);
     }
-
-    JSValue args[1];
-    args[0] = newArray;
-
-    JSValue ret = JS_Call(ctx, *pfunc, JS_UNDEFINED, 1, args);
 
     if (JS_IsException(ret))
     {
@@ -490,12 +501,39 @@ void destroy_javascript(JSRuntime **prt, JSContext **pctx)
     JS_FreeRuntime(*prt);
 }
 
-int main()
+int main(int argc, char* argv[])
 {
 
     JSRuntime *rt = 0;
     JSContext *ctx = 0;
     init_javascript(&rt, &ctx);
+
+    char* command_line_script_name = 0;
+
+    if (argc >2) {
+        printf("usage: control_surface_move <control script.js>");
+        exit(1);
+    }
+
+    if (argc == 2) {
+        command_line_script_name = argv[1];
+    }
+    
+    char default_script_name[] = "move_default.js";
+
+    char* script_name = 0;
+    
+    if (command_line_script_name != 0) {
+        printf("Loading script from command-line: %s\n", command_line_script_name);
+
+        script_name = command_line_script_name;
+    } else {
+        printf("No script passed on the command-line, loading the default script: %s\n", default_script_name);
+        script_name = default_script_name;
+    }
+
+    eval_file(ctx, script_name, -1);
+
 
     const char *device_path = "/dev/ablspi0.0";
     struct timespec sleep_time;
@@ -562,6 +600,9 @@ The velocity vvvvvvv (0…127) selects a color index, which is interpreted diffe
 */
 
     /*
+
+        https://www.usb.org/sites/default/files/midi10.pdf
+
         CIN     MIDI_x Size     Description
         0x0     1, 2 or 3       Miscellaneous function codes. Reserved for future extensions.
         0x1     1, 2 or 3       Cable events. Reserved for future expansion.
@@ -612,14 +653,16 @@ The velocity vvvvvvv (0…127) selects a color index, which is interpreted diffe
     clearPads(mapped_memory, fd);
     clearSequencerButtons(mapped_memory, fd);
 
-    eval_file(ctx, "move_m8.js", -1);
+    JSValue JSonMidiMessageExternal;
+    getGlobalFunction(&ctx, "onMidiMessageExternal", &JSonMidiMessageExternal);
 
-     JSValue onMidiMessageExternal;
-    getGlobalFunction(&ctx, "onMidiMessageExternal", &onMidiMessageExternal);
+    JSValue JSonMidiMessageInternal;
+    getGlobalFunction(&ctx, "onMidiMessageInternal", &JSonMidiMessageInternal);
 
-    JSValue onMidiMessageInternal;
-    getGlobalFunction(&ctx, "onMidiMessageInternal", &onMidiMessageInternal);
+    JSValue JSinit;
+    getGlobalFunction(&ctx, "init", &JSinit);
 
+    callGlobalFunction(&ctx, &JSinit, 0);
 
     while (1)
     {
@@ -672,13 +715,13 @@ The velocity vvvvvvv (0…127) selects a color index, which is interpreted diffe
 
             if (cable == 2)
             {
-                callGlobalFunction(&ctx, &onMidiMessageExternal, &byte[1]);
+                callGlobalFunction(&ctx, &JSonMidiMessageExternal, &byte[1]);
                 
             }
 
             if (cable == 0)
             {
-                callGlobalFunction(&ctx, &onMidiMessageInternal, &byte[1]);
+                callGlobalFunction(&ctx, &JSonMidiMessageInternal, &byte[1]);
             }
 
             // printf("cable: %x,\tcode index number:%x,\tmidi_0:%x,\tmidi_1:%x,\tmidi_2:%x\n", cable, code_index_number, midi_0, midi_1, midi_2);
