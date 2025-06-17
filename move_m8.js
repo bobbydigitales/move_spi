@@ -149,14 +149,14 @@ globalThis.onMidiMessageInternal = function (data) {
     }
 
 
-    if (isAftertouch) {
-        let value = data[2]
-        // Send per note aftertouch out as a single MIDI Modwheel CC
-        console.log(`Sending Move aftertouch value ${value} to as CC 1`);
+    // if (isAftertouch) {
+    //     let value = data[2]
+    //     // Send per note aftertouch out as a single MIDI Modwheel CC
+    //     console.log(`Sending Move aftertouch value ${value} to as CC 1`);
 
-        move_midi_external_send([2 << 4 | 0xb, 0xb0, 1, value]);
-        return;
-    }
+    //     move_midi_external_send([2 << 4 | 0xb, 0xb0, 1, value]);
+    //     return;
+    // }
 
     console.log(`Unmapped Move message: ${data}`);
 
