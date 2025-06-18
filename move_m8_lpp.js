@@ -134,8 +134,8 @@ globalThis.onMidiMessageInternal = function (data) {
         let lppVelocity = moveVelocity; //moveVelocityToLppVelocityMap.get(data[2]) ?? moveVelocity;
 
 
-        console.log(`Sending Move note ${moveNoteNumber} velocity: ${moveVelocity} to LPP pad ${lppNote} velocity: ${lppVelocity}`);
-        move_midi_external_send([2 << 4 | (data[0] / 0xF), data[0], lppNote, lppVelocity]);
+        console.log(`Sending Move note ${moveNoteNumber} velocity: ${moveVelocity} to LPP pad ${lppNote} velocity: 100`);
+        move_midi_external_send([2 << 4 | (data[0] / 0xF), data[0], lppNote, 100]);
         return;
     }
 
