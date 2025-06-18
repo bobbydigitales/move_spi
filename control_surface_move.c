@@ -79,7 +79,7 @@ int queueMidiSend(int cable, unsigned char *buffer, int length)
 
     // buffer[0] = cable << 4 | buffer[0];
 
-    printf("queueMidi: queueing %d bytes to outgoing MIDI ,counter:%d\n", length, outgoing_midi_counter);
+    // printf("queueMidi: queueing %d bytes to outgoing MIDI ,counter:%d\n", length, outgoing_midi_counter);
     // memcpy(((struct SPI_Memory *)mapped_memory)->outgoing_midi + outgoing_midi_counter, buffer, length);
     memcpy(((struct SPI_Memory *)mapped_memory)->outgoing_midi + outgoing_midi_counter, buffer, length);
 
@@ -93,7 +93,7 @@ int queueMidiSend(int cable, unsigned char *buffer, int length)
         outgoing_midi_counter = 0;
 
     }
-    printf("queueMidiSend: %d\n", outgoing_midi_counter);
+    // printf("queueMidiSend: %d\n", outgoing_midi_counter);
     // if (outgoing_midi_counter > )
 }
 
@@ -330,7 +330,7 @@ static JSValue js_move_midi_send(int cable, JSContext *ctx, JSValueConst this_va
     JS_ToUint32(ctx, &len, length_val);
     JS_FreeValue(ctx, length_val);
 
-    printf("[");
+    // printf("[");
     JSValue entry;
     for (int i = 0; i < len; i++)
     {
@@ -355,11 +355,11 @@ static JSValue js_move_midi_send(int cable, JSContext *ctx, JSValueConst this_va
         }
 
         // total_sum += byte_val;
-        printf("%d(%x)", byte_val, byte_val);
-        if (i != len - 1)
-        {
-            printf(", ");
-        }
+        // printf("%d(%x)", byte_val, byte_val);
+        // if (i != len - 1)
+        // {
+        //     printf(", ");
+        // }
 
         js_move_mid_send_buffer[send_buffer_index] = byte_val;
         send_buffer_index++;
@@ -373,7 +373,7 @@ static JSValue js_move_midi_send(int cable, JSContext *ctx, JSValueConst this_va
         JS_FreeValue(ctx, val);
     }
 
-    printf("]\n");
+    // printf("]\n");
 
     // flushMidi();
     queueMidiSend(cable, (unsigned char *)js_move_mid_send_buffer, send_buffer_index);
