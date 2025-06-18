@@ -60,9 +60,22 @@ const moveColorToLppColorMap = new Map([...lppColorToMoveColorMap.entries()].map
 // let lppInitialized = false;
 
 globalThis.onMidiMessageExternal = function (data) {
-    console.log(`onMidiMessageExternal ${data[0].toString(16)} ${data[1].toString(16)} ${data[2].toString(16)}`);
+    if (data[0] == 0xf8) {
+        // midi clock, ignoring...
+        return;
+    }
 
-    if (!(data[0] === 0x90 || data[0] === 0x80)) {
+    console.log(`onMidiMessageExternal ${data[0].toString(16)} ${data[1].toString(16)} ${data[2].toString(16)}`);
+    
+    let value = data[0];
+    let maskedValue = (value & 0xf0);
+
+    let noteOn = maskedValue === 0x90;
+    let noteOff = maskedValue === 0x80;
+
+    console.log(value, maskedValue, noteOn, noteOff);
+
+    if (!(noteOn || noteOff)) {
         console.log(`Got message from M8 that is not a note: ${data}`);
     }
 
@@ -73,7 +86,7 @@ globalThis.onMidiMessageExternal = function (data) {
     let moveVelocity = lppColorToMoveColorMap.get(lppVelocity) ?? lppVelocity;
 
     if (moveNoteNumber) {
-        move_midi_internal_send([0 << 4 | (data[0] / 16), data[0], moveNoteNumber, moveVelocity]);
+        move_midi_internal_send([0 << 4 | (maskedValue / 16), maskedValue, moveNoteNumber, moveVelocity]);
         return;
     }
 
@@ -91,13 +104,18 @@ globalThis.onMidiMessageExternal = function (data) {
 }
 
 globalThis.onMidiMessageInternal = function (data) {
-    console.log(`onMidiMessageInternal ${data[0].toString(16)} ${data[1].toString(16)} ${data[2].toString(16)}`);
-
+    
     let isNote = data[0] === 0x80 || data[0] === 0x90;
     let isCC = data[0] === 0xb0;
     let isAt = data[0] === 0xa0;
+    
+    if (isAt) {
+        // ignore aftertouch for now
+        return;
+    }
 
-    if (!(isNote || isCC || isAt)) {
+    console.log(`onMidiMessageInternal ${data[0].toString(16)} ${data[1].toString(16)} ${data[2].toString(16)}`);
+    if (!(isNote || isCC)) {
         console.log(`Move: unknown message:`, data);
         return;
     }
@@ -156,7 +174,7 @@ globalThis.onMidiMessageInternal = function (data) {
 
 }
 
-let lppInitSysex = [0xF0, 126, 0, 6, 2, 0, 32, 41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF7];
+// let lppInitSysex = [0xF0, 126, 0, 6, 2, 0, 32, 41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF7];
 
 function initLPP() {
     let out_cable = 2;
