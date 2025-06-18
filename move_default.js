@@ -53,9 +53,20 @@ globalThis.init = function() {
     console.log("Move default control surface script starting...");
 
     for (let i=0; i<32; i++) {
-        console.log(`set pad:${i}\n`);
-        move_midi_external_send([0<<4 | 0x9, 0x90, i + 68, 0xfe]);
+        // console.log(`set pad:${i} ${(i+68) == 87 ? ">>>>>>>>>>>>>>>>>" : ""}\n`);
+        move_midi_internal_send([0<<4 | 0x9, 0x90, i + 68, 0xff]);
+        // move_midi_internal_send([0<<4 | 0x9, 0x9a, i + 68, 0]);        
     }
-
-
 }
+
+// let animCounter = 0;
+// globalThis.tick = function(deltaTime) {
+
+//     if (animCounter++ < 16) {
+//         return;
+//     }
+
+//     move_midi_internal_send([0<<4 | 0xf, 0xf8, 0, 0]);
+
+//     animCounter = 0;
+// }

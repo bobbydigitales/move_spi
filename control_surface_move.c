@@ -10,6 +10,9 @@
 
 #include "libs/quickjs/quickjs-2025-04-26/quickjs.h"
 #include "libs/quickjs/quickjs-2025-04-26/quickjs-libc.h"
+
+int global_fd = -1;
+
 // #include <map>
 
 // using namespace std;
@@ -76,14 +79,21 @@ int queueMidiSend(int cable, unsigned char *buffer, int length)
 
     // buffer[0] = cable << 4 | buffer[0];
 
-    // printf("queueMidi: queueing %d bytes to outgoing MIDI ,counter:%d\n", length, outgoing_midi_counter);
+    printf("queueMidi: queueing %d bytes to outgoing MIDI ,counter:%d\n", length, outgoing_midi_counter);
     // memcpy(((struct SPI_Memory *)mapped_memory)->outgoing_midi + outgoing_midi_counter, buffer, length);
     memcpy(((struct SPI_Memory *)mapped_memory)->outgoing_midi + outgoing_midi_counter, buffer, length);
 
     // int ioctl_result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
 
     outgoing_midi_counter += length;
-    // printf("queueMidiSend: %d\n", outgoing_midi_counter);
+
+
+    if (outgoing_midi_counter >= 80) {
+        int ioctl_result = ioctl(global_fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
+        outgoing_midi_counter = 0;
+
+    }
+    printf("queueMidiSend: %d\n", outgoing_midi_counter);
     // if (outgoing_midi_counter > )
 }
 
@@ -372,13 +382,13 @@ static JSValue js_move_midi_send(int cable, JSContext *ctx, JSValueConst this_va
 static JSValue js_move_midi_external_send(JSContext *ctx, JSValueConst this_val,
                                           int argc, JSValueConst *argv)
 {
-    js_move_midi_send(2, ctx, this_val, argc, argv);
+    return js_move_midi_send(2, ctx, this_val, argc, argv);
 }
 
 static JSValue js_move_midi_internal_send(JSContext *ctx, JSValueConst this_val,
                                           int argc, JSValueConst *argv)
 {
-    js_move_midi_send(0, ctx, this_val, argc, argv);
+    return js_move_midi_send(0, ctx, this_val, argc, argv);
 }
 
 
@@ -416,7 +426,7 @@ void init_javascript(JSRuntime **prt, JSContext **pctx)
     JSValue move_midi_external_send_func = JS_NewCFunction(ctx, js_move_midi_external_send, "move_midi_external_send", 1);
     JS_SetPropertyStr(ctx, global_obj, "move_midi_external_send", move_midi_external_send_func);
 
-    JSValue move_midi_internal_send_func = JS_NewCFunction(ctx, js_move_midi_external_send, "move_midi_internal_send", 1);
+    JSValue move_midi_internal_send_func = JS_NewCFunction(ctx, js_move_midi_internal_send, "move_midi_internal_send", 1);
     JS_SetPropertyStr(ctx, global_obj, "move_midi_internal_send", move_midi_internal_send_func);
 
     JS_FreeValue(ctx, global_obj);
@@ -433,7 +443,7 @@ void init_javascript(JSRuntime **prt, JSContext **pctx)
     *pctx = ctx;
 }
 
-void getGlobalFunction(JSContext **pctx, const char *func_name, JSValue *retFunc)
+int getGlobalFunction(JSContext **pctx, const char *func_name, JSValue *retFunc)
 {
 
     JSContext *ctx = *pctx;
@@ -450,9 +460,12 @@ void getGlobalFunction(JSContext **pctx, const char *func_name, JSValue *retFunc
     {
         fprintf(stderr, "Error: '%s' is not a function or not found.\n", func_name);
         JS_FreeValue(ctx, func); // Free the non-function value
+        return 0;
     }
 
     *retFunc = func;
+
+    return 1;
 }
 
 int callGlobalFunction(JSContext **pctx, JSValue *pfunc, unsigned char *data)
@@ -555,6 +568,8 @@ int main(int argc, char* argv[])
         perror("open");
         return 1;
     }
+
+    global_fd = fd;
 
     printf("mmaping\n");
     mapped_memory = (unsigned char *)mmap(NULL, length, prot, flags, fd, offset);
@@ -662,10 +677,18 @@ The velocity vvvvvvv (0…127) selects a color index, which is interpreted diffe
     JSValue JSinit;
     getGlobalFunction(&ctx, "init", &JSinit);
 
+    JSValue JSTick;
+    int jsTickIsDefined = getGlobalFunction(&ctx, "tick", &JSTick);
+
+    printf("JS:calling init\n");
     callGlobalFunction(&ctx, &JSinit, 0);
 
     while (1)
     {
+        if (jsTickIsDefined) {
+            callGlobalFunction(&ctx, &JSTick, 0);
+        }
+
         // printf("\033[H\033[J");
 
         ioctl_result = ioctl(fd, _IOC(_IOC_NONE, 0, 0xa, 0), 0x300);
