@@ -73,7 +73,7 @@ globalThis.onMidiMessageExternal = function (data) {
     let noteOn = maskedValue === 0x90;
     let noteOff = maskedValue === 0x80;
 
-    console.log(value, maskedValue, noteOn, noteOff);
+    // console.log(value, maskedValue, noteOn, noteOff);
 
     if (!(noteOn || noteOff)) {
         console.log(`Got message from M8 that is not a note: ${data}`);
